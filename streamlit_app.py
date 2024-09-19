@@ -14,7 +14,7 @@ if 'OLLAMA_API_BASE_URL' not in os.environ:
     os.environ["OPENAI_API_KEY"] = config('OPENAI_API_KEY')
 OLLAMA_API_BASE_URL = os.environ['OLLAMA_API_BASE_URL'] if 'OLLAMA_API_BASE_URL' in os.environ else config('OLLAMA_API_BASE_URL')   
 MODEL = os.environ['MODEL'] if 'MODEL' in os.environ else config('MODEL')   
-
+print(f"Using model: {MODEL}")
 
 
 def generate_response(input_text):
