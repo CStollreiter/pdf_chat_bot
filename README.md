@@ -5,8 +5,8 @@
 
 Create a new Conda environment and install the necessary packages:
 ```
-$ conda env create -n llm_app python=3.9.16
-$ conda activate llm_app
+$ conda create -n llm-app python=3.9.18
+$ conda activate llm-app
 $ pip3 install -r requirements.txt
 ```
 
@@ -32,5 +32,5 @@ $ docker run -p 8501:8501 streamlit
 
 Generate requirements file
 ```
-$ pip freeze > requirements.txt
+$ pip list --format=freeze > requirements.txt
 ```

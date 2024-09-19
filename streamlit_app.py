@@ -1,28 +1,29 @@
 import streamlit as st
 
-from langchain_openai import OpenAI
+# from langchain_openai import OpenAI
 from langchain_community.llms import Ollama
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
 
 from decouple import config
 import os
-# from dotenv import load_dotenv
 
 st.title("LLM App")
 
-# add OpenAi API key from .env file to environment variables
-os.environ["OPENAI_API_KEY"] = config('OPENAI_API_KEY')
+# load variables from .env file if they are not already set as environment variables
+if 'OLLAMA_API_BASE_URL' not in os.environ:
+    os.environ["OPENAI_API_KEY"] = config('OPENAI_API_KEY')
+OLLAMA_API_BASE_URL = os.environ['OLLAMA_API_BASE_URL'] if 'OLLAMA_API_BASE_URL' in os.environ else config('OLLAMA_API_BASE_URL')   
+MODEL = os.environ['MODEL'] if 'MODEL' in os.environ else config('MODEL')   
+
 
 
 def generate_response(input_text):
-    model = OpenAI(model="gpt-3.5-turbo-instruct", temperature=0)
-    '''
+    # model = OpenAI(model="gpt-3.5-turbo-instruct", temperature=0)
     model = Ollama(
-        base_url="http://localhost:11434", 
-        model="deepseek-coder-v2", 
+        base_url=OLLAMA_API_BASE_URL, 
+        model=MODEL, 
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-    '''
     st.info(model.invoke(input_text))
 
 
