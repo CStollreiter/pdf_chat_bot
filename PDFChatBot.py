@@ -1,6 +1,6 @@
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores.chroma import Chroma
+from langchain_community.vectorstores import Chroma
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -80,6 +80,7 @@ class PDFChatBot:
         return self._store[session_id]
 
     def get_response(self, question, session_id):
+        print('--- Generating response ---')
         return self._rag_chain_with_history.invoke(
             {"input": question},
             config={
