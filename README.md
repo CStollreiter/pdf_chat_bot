@@ -5,8 +5,8 @@
 
 Create a new Conda environment and install the necessary packages:
 ```
-$ conda create -n llm-app python=3.9.18
-$ conda activate llm-app
+$ conda create -n pdf-chat-bot python=3.9.18
+$ conda activate pdf-chat-bot
 $ pip3 install -r requirements.txt
 ```
 

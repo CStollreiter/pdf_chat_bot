@@ -25,6 +25,7 @@ dataclasses-json==0.6.7
 debugpy==1.6.7
 decorator==5.1.1
 Deprecated==1.2.14
+diskcache==5.6.3
 distro==1.9.0
 exceptiongroup==1.2.2
 executing==2.1.0
@@ -70,6 +71,7 @@ langchain-ollama==0.2.0
 langchain-openai==0.2.0
 langchain-text-splitters==0.3.0
 langsmith==0.1.123
+llama_cpp_python==0.2.90
 markdown-it-py==3.0.0
 MarkupSafe==2.1.5
 marshmallow==3.22.0
