@@ -1,4 +1,4 @@
-# llm_app
+# PDF Chat Bot
 
 
 ### Run locally on Mac
