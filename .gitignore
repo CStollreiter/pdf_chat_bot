@@ -2,3 +2,4 @@
 chroma_db/
 models/
 __pycache__/
+logs/
