@@ -81,7 +81,7 @@ class PDFChatBot:
         return self.chat_history[session_id]
 
     def get_response(self, question, session_id):
-        print('--- Generating response ---')
+        print(f'Generating response for question: {question}')
         return self._chain.invoke(
             {"input": question},
             config={
@@ -90,10 +90,11 @@ class PDFChatBot:
         )
 
     def stream_response(self, question, session_id):
-        print('--- Streaming response ---')
+        print(f'Streaming response for question: {question}')
         return self._chain.stream(
             {"input": question},
             config={
                 "configurable": {"session_id": session_id}
             }
         )
+            
