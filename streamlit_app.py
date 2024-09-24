@@ -1,6 +1,7 @@
 import streamlit as st
 
 import logging
+import sys
 from datetime import datetime
 from decouple import config
 import os
@@ -40,6 +41,8 @@ logging.basicConfig(
     format="%(levelname)s:%(name)s: %(message)s"
 )
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+
 
 st.title('PDF Chat Bot')
 
@@ -53,12 +56,11 @@ with st.spinner('Loading models and PDF file ...'):
     EMBEDDING_MODEL = os.environ['EMBEDDING_MODEL'] if 'EMBEDDING_MODEL' in os.environ else config('EMBEDDING_MODEL')  
 
     if 'chat_bot' not in st.session_state:
+        logger.info(f'Loading embedding model: {EMBEDDING_MODEL}')
+        embedding_model = HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL
+        )
 
-        print(f'Loading embedding model {EMBEDDING_MODEL}')
-        logger.info(f'Loading embedding model {EMBEDDING_MODEL}')
-        embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-
-        print(f'Loading LLM: {LLM}')
         logger.info(f'Loading LLM: {LLM}')
         llm = ChatOllama(
             base_url=OLLAMA_API_BASE_URL, 

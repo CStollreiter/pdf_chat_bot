@@ -1,4 +1,5 @@
 import logging
+import sys
 from datetime import datetime
 
 from langchain_community.document_loaders import PyPDFLoader
@@ -19,16 +20,14 @@ class PDFChatBot:
     def __init__(self, pdf_path, embedding_model, llm, vectorstore_persist_directory='chroma_db', use_logging=False):
         if use_logging: 
             self._logger = logging.getLogger(__name__)
+            self._logger.addHandler(logging.StreamHandler(sys.stdout))
 
-        print('Initializing PDF Chatbot ...')
         if self._logger: self._logger.info('Initializing PDF Chatbot ...')
         
-        print('- Loading and vectorizing PDF file')
         if self._logger: self._logger.info("- Loading and vectorizing PDF file")
         pdf_data = self._load_pdf_data(pdf_path)
         self._vectorstore = Chroma.from_documents(pdf_data, embedding=embedding_model, persist_directory=vectorstore_persist_directory)
 
-        print('- Initializing history aware retriever')
         if self._logger: self._logger.info('- Initializing history aware retriever')
         self.chat_history = {}
         retriever_prompt = (
@@ -51,7 +50,6 @@ class PDFChatBot:
             self._retriever_prompt
         )
 
-        print('- Initializing Q & A chain')
         if self._logger: self._logger.info('- Initializing Q & A chain')
         qa_prompt = """You are an assistant for question-answering tasks. 
             Use the chat history and the following pieces of retrieved context to answer the question. 
@@ -67,7 +65,6 @@ class PDFChatBot:
         )
         qa_chain = create_stuff_documents_chain(llm, self._qa_prompt)
 
-        print('- Initializing RAG chain')
         if self._logger: self._logger.info('- Initializing RAG chain')
         rag_chain = create_retrieval_chain(self._retriever, qa_chain)
         self._chain = RunnableWithMessageHistory(
@@ -88,12 +85,11 @@ class PDFChatBot:
     
     def _get_session_history(self, session_id: str) -> BaseChatMessageHistory:
         if session_id not in self.chat_history:
-            print(f'Session ID: {session_id}')
+            if self._logger: self._logger.info(f'Session ID {session_id} added to chat history store')
             self.chat_history[session_id] = ChatMessageHistory()
         return self.chat_history[session_id]
 
     def get_response(self, question, session_id):
-        print(f'Generating response for question "{question}"')
         if self._logger: self._logger.info(f'Generating response for question "{question}" and session ID {session_id}')
         return self._chain.invoke(
             {"input": question},
@@ -103,7 +99,6 @@ class PDFChatBot:
         )
 
     def stream_response(self, question, session_id):
-        print(f'Streaming response for question: {question}')
         if self._logger: self._logger.info(f'Streaming response for question "{question}" and session ID {session_id}')
         return self._chain.stream(
             {"input": question},
