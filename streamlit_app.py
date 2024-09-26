@@ -88,7 +88,6 @@ with st.form('my_form'):
     )
     submitted = st.form_submit_button('Submit')
     if submitted:
-        # response = st.session_state.chat_bot.get_response(question, session_id=st.session_state.session_id)
-        # st.info(response)
-        st.write_stream(format_response_stream(st.session_state.chat_bot.stream_response(question, session_id=st.session_state.session_id)))
+        with st.spinner():
+            st.write_stream(format_response_stream(st.session_state.chat_bot.stream_response(question, session_id=st.session_state.session_id)))
 
