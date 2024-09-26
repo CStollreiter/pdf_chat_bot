@@ -1,6 +1,8 @@
-import logging
 import sys
+import os
 from datetime import datetime
+import logging
+import tempfile
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -17,7 +19,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 
 
 class PDFChatBot:
-    def __init__(self, pdf_path, embedding_model, llm, vectorstore_persist_directory='chroma_db', logging_file_handler=None):
+    def __init__(self, uploaded_pdf_files, embedding_model, llm, vectorstore_persist_directory='chroma_db', logging_file_handler=None):
         self._logger = logging.getLogger(__name__)
         if logging_file_handler: 
             self._logger.addHandler(logging_file_handler)
@@ -25,18 +27,17 @@ class PDFChatBot:
         self._logger.info('Initializing PDF Chatbot ...')
         
         self._logger.info("- Loading and vectorizing PDF file")
-        pdf_data = self._load_pdf_data(pdf_path)
+        # pdf_data = self._load_pdf_data(pdf_path)
+        pdf_data = self._process_pdf_files(uploaded_pdf_files)
         self._vectorstore = Chroma.from_documents(pdf_data, embedding=embedding_model, persist_directory=vectorstore_persist_directory)
 
         self._logger.info('- Initializing history aware retriever')
         self.chat_history = {}
-        retriever_prompt = (
-            "Given a chat history and the latest user question "
-            "which might reference context in the chat history, "
-            "formulate a standalone question which can be understood "
-            "without the chat history. Do NOT answer the question, "
-            "just reformulate it if needed and otherwise return it as is."
-        )
+        retriever_prompt = """
+Given a chat history and the latest user question which might reference context in the chat history, 
+formulate a standalone question which can be understood without the chat history. Do NOT answer the question, "
+just reformulate it if needed and otherwise return it as is.
+        """
         self._retriever_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", retriever_prompt),
@@ -51,11 +52,13 @@ class PDFChatBot:
         )
 
         self._logger.info('- Initializing Q & A chain')
-        qa_prompt = """You are an assistant for question-answering tasks. 
-            Use the chat history and the following pieces of retrieved context to answer the question. 
-            If you don't know the answer, just say that you don't know, don't try to make up an answer.
-            If you find the answer, write the answer in a concise way. 
-            Context: {context}"""
+        qa_prompt = """
+You are an assistant for answering questions about PDF files. 
+Use the chat history and the PDF files in the context to answer the question. 
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+If you find the answer, write the answer in a concise way. 
+Context: {context}
+        """
         self._qa_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", qa_prompt),
@@ -75,13 +78,29 @@ class PDFChatBot:
             output_messages_key="answer",
         )
 
-    def _load_pdf_data(self, file_path, use_splitter=True):
+    def _load_pdf_file(self, file_path, use_splitter=True):
         loader = PyPDFLoader(file_path)
         if use_splitter:
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             return loader.load_and_split(text_splitter)
         else:
             return loader.load()
+
+    def _process_pdf_files(self, uploaded_files, use_splitter=True):
+        docs = []
+        temp_dir = tempfile.TemporaryDirectory()
+        for file in uploaded_files:
+            temp_filepath = os.path.join(temp_dir.name, file.name)
+            with open(temp_filepath, "wb") as f:
+                f.write(file.getvalue())
+            loader = PyPDFLoader(temp_filepath)
+            docs.extend(loader.load())
+        if use_splitter:
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+            return text_splitter.split_documents(docs)
+        else:
+            return docs
+
     
     def _get_session_history(self, session_id: str) -> BaseChatMessageHistory:
         if session_id not in self.chat_history:
