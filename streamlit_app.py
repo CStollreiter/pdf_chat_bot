@@ -13,6 +13,21 @@ from langchain_ollama import ChatOllama
 from PDFChatBot import PDFChatBot
 
 
+# initialize logger
+print_log_file = False
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:%(name)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
+if print_log_file:
+    timestamp = datetime.now()
+    file_handler = logging.FileHandler(f'logs/app_run_{timestamp.strftime("%Y-%m-%d_%H-%M-%s")}.log')
+    logger.addHandler(file_handler)
+else:
+    file_handler = None
+
+
 def format_response_stream(response_stream):
     for chunk in response_stream:
         if 'context' in chunk:
@@ -32,16 +47,6 @@ def format_response_stream(response_stream):
 **Page:** {document.metadata["page"]}\n
 **Content:** "{document.page_content}"
         '''
-
-# initialize logger
-timestamp = datetime.now()
-logging.basicConfig(
-    filename=f'logs/app_run_{timestamp.strftime("%Y-%m-%d_%H-%M-%s")}.log', 
-    level=logging.INFO,
-    format="%(levelname)s:%(name)s: %(message)s"
-)
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 st.title('PDF Chat Bot')
@@ -67,7 +72,12 @@ with st.spinner('Loading models and PDF file ...'):
             model=LLM
         )
 
-        st.session_state.chat_bot = PDFChatBot('/Users/stolli/IT/Designing Data-Intensive Applications.pdf', embedding_model, llm, use_logging=True)
+        st.session_state.chat_bot = PDFChatBot(
+            '/Users/stolli/IT/Designing Data-Intensive Applications.pdf', 
+            embedding_model, 
+            llm, 
+            logging_file_handler=file_handler
+        )
         st.session_state.session_id = str(uuid.uuid4()).replace('-', '_')
 
 
