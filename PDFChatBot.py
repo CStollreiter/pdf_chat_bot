@@ -3,10 +3,14 @@ import os
 from datetime import datetime
 import logging
 import tempfile
+from uuid import uuid4
+
+import chromadb
+from chromadb.config import Settings
+from langchain_chroma import Chroma
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -19,18 +23,25 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 
 
 class PDFChatBot:
-    def __init__(self, uploaded_pdf_files, embedding_model, llm, vectorstore_persist_directory='chroma_db', logging_file_handler=None):
+    def __init__(self, embedding_model, llm, vectorstore_persist_directory='chroma_db', logging_file_handler=None):
         self._logger = logging.getLogger(__name__)
         if logging_file_handler: 
             self._logger.addHandler(logging_file_handler)
 
         self._logger.info('Initializing PDF Chatbot ...')
-        
-        self._logger.info("- Loading and vectorizing PDF file")
-        # pdf_data = self._load_pdf_data(pdf_path)
-        pdf_data = self._process_pdf_files(uploaded_pdf_files)
-        self._vectorstore = Chroma.from_documents(pdf_data, embedding=embedding_model, persist_directory=vectorstore_persist_directory)
 
+        self._logger.info('- Initializing vector database')
+        self._chroma_client = chromadb.PersistentClient(path=vectorstore_persist_directory, settings=Settings(allow_reset=True)) 
+        self._chroma_client.reset()
+        self._chroma_client.create_collection(name="pdf_files")
+        self._vectorstore = Chroma(
+            client=self._chroma_client,  
+            collection_name="pdf_files",
+            embedding_function=embedding_model,
+        )
+        # create dictionnary for processed files: key=file_id, values=vectorstore_ids
+        self.processed_files = {}
+        
         self._logger.info('- Initializing history aware retriever')
         self.chat_history = {}
         retriever_prompt = """
@@ -78,29 +89,35 @@ Context: {context}
             output_messages_key="answer",
         )
 
-    def _load_pdf_file(self, file_path, use_splitter=True):
-        loader = PyPDFLoader(file_path)
+    def add_pdf_data(self, *, pdf_file_path=None, pdf_file=None, file_id=str(uuid4())):
+        self._logger.info(f'Adding PDF data to vectorstore ({file_id=})')
+        if pdf_file_path:
+            pdf_data = self._load_pdf_file(pdf_file_path)
+        elif pdf_file:
+            pdf_data = self._process_pdf_file(pdf_file)
+        else:
+            raise ValueError("No PDF file provided")
+        document_ids = self._vectorstore.add_documents(pdf_data)
+        self.processed_files[file_id] = document_ids
+    
+    def remove_pdf_data(self, file_id):
+        self._logger.info(f'Removing PDF data from vectorstore ({file_id=})')
+        self._vectorstore.delete(ids=self.processed_files[file_id])
+
+    def _load_pdf_file(self, pdf_file_path, use_splitter=True):
+        pdf_data_loader = PyPDFLoader(pdf_file_path)
         if use_splitter:
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            return loader.load_and_split(text_splitter)
+            return pdf_data_loader.load_and_split(text_splitter)
         else:
-            return loader.load()
+            return pdf_data_loader.load()
 
-    def _process_pdf_files(self, uploaded_files, use_splitter=True):
-        docs = []
+    def _process_pdf_file(self, pdf_file, use_splitter=True):
         temp_dir = tempfile.TemporaryDirectory()
-        for file in uploaded_files:
-            temp_filepath = os.path.join(temp_dir.name, file.name)
-            with open(temp_filepath, "wb") as f:
-                f.write(file.getvalue())
-            loader = PyPDFLoader(temp_filepath)
-            docs.extend(loader.load())
-        if use_splitter:
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-            return text_splitter.split_documents(docs)
-        else:
-            return docs
-
+        temp_filepath = os.path.join(temp_dir.name, pdf_file.name)
+        with open(temp_filepath, "wb") as f:
+            f.write(pdf_file.getvalue())
+        return self._load_pdf_file(temp_filepath, use_splitter)
     
     def _get_session_history(self, session_id: str) -> BaseChatMessageHistory:
         if session_id not in self.chat_history:

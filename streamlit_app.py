@@ -1,11 +1,11 @@
 import streamlit as st
 
-import logging
 import sys
-from datetime import datetime
-from decouple import config
 import os
-import uuid
+from datetime import datetime
+import logging
+from uuid import uuid4
+from decouple import config
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
@@ -38,9 +38,10 @@ def format_response_stream(response_stream):
     yield '\n\n#### Sources'
     # remove duplicates
     unique_documents = []
-    for entry in context:
-        if entry not in unique_documents:
-            unique_documents.append(entry)
+    for document in context:
+        if document.page_content not in [doc.page_content for doc in unique_documents]:
+            unique_documents.append(document)
+    unique_documents.sort(key = lambda document: document.metadata["page"])
     for document in unique_documents:
         source = document.metadata["source"]
         source_title = source[(source.rfind('/')+1):]
@@ -48,43 +49,49 @@ def format_response_stream(response_stream):
 **Source:** {source_title}\n
 **Page:** {document.metadata["page"]}\n
 **Content:** "{document.page_content}"
-        '''
+            '''
 
 
 st.title('PDF Chat Bot')
 
 
-if 'embedding_model' not in st.session_state or 'llm' not in st.session_state:
-    with st.spinner('Loading models ...'):
+if 'chat_bot' not in st.session_state:
+    with st.spinner('Initializing PDF bot ...'):
         OLLAMA_API_BASE_URL = os.environ['OLLAMA_API_BASE_URL'] if 'OLLAMA_API_BASE_URL' in os.environ else config('OLLAMA_API_BASE_URL')   
         
         EMBEDDING_MODEL = os.environ['EMBEDDING_MODEL'] if 'EMBEDDING_MODEL' in os.environ else config('EMBEDDING_MODEL')  
         logger.info(f'Loading embedding model: {EMBEDDING_MODEL}')
-        st.session_state.embedding_model = HuggingFaceEmbeddings(
+        embedding_model = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL
         )
 
         LLM = os.environ['LLM'] if 'LLM' in os.environ else config('LLM')   
         logger.info(f'Loading LLM: {LLM}')
-        st.session_state.llm = ChatOllama(
+        llm = ChatOllama(
             base_url=OLLAMA_API_BASE_URL, 
             model=LLM
         )
 
-uploaded_pdf_files = st.file_uploader("Please upload one or multiple PDF files", type = "pdf", accept_multiple_files=True)  
-# check if pdf files have changed
-if len(uploaded_pdf_files) > 0 and ('file_ids' not in st.session_state or set(st.session_state.file_ids) != set([file.file_id for file in uploaded_pdf_files])):
-    with st.spinner('Processing PDF files ...'):
-        st.session_state.file_ids = [file.file_id for file in uploaded_pdf_files]
         st.session_state.chat_bot = PDFChatBot(
-            uploaded_pdf_files,
-            st.session_state.embedding_model, 
-            st.session_state.llm, 
+            embedding_model, 
+            llm, 
             logging_file_handler=file_handler
         )
-        st.session_state.session_id = str(uuid.uuid4()).replace('-', '_')
+        st.session_state.session_id = str(uuid4()).replace('-', '_')
+        st.session_state.processed_files = []
 
-if 'chat_bot' in st.session_state:
+uploaded_pdf_files = st.file_uploader("Please upload one or multiple PDF files", type="pdf", accept_multiple_files=True)  
+for file_id in st.session_state.processed_files:
+    if file_id not in [file.file_id for file in uploaded_pdf_files]:
+        st.session_state.chat_bot.remove_pdf_data(file_id)
+        st.session_state.processed_files.remove(file_id)  
+
+if len(uploaded_pdf_files) > 0:
+    for file in uploaded_pdf_files:
+        if file.file_id not in st.session_state.processed_files:
+            with st.spinner('Processing PDF ...'):
+                st.session_state.chat_bot.add_pdf_data(pdf_file=file, file_id=file.file_id)
+                st.session_state.processed_files.append(file.file_id)
     with st.form('chat_interface'):
         question = st.text_area(
             'Enter text:',
